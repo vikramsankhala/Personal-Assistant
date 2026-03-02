@@ -5,12 +5,12 @@ Welcome to **MeetScribe**, your AI-powered virtual stenographer. This guide will
 ## 🚀 Getting Started
 
 ### 1. Launch the Application
-- Visit the landing page and click **"Launch App"** or **"Open Application"**.
+- Visit the landing page and click ***Launch App*** or ***Open Application***.
 - Grant microphone permissions when prompted by your browser.
 
 ### 2. Choose Your Capture Mode
 - **Microphone (Default):** Use this for in-person meetings or when you only need to capture your own voice.
-- **System Audio:** **(Recommended for Online Meetings)** Use this for MS Teams, Zoom, or Google Meet. It captures the crystal-clear audio from all participants directly from your computer.
+- **System Audio: ** **(Recommended for Online Meetings)** Use this for MS Teams, Zoom, or Google Meet. It captures the crystal-clear audio from all participants directly from your computer.
 
 ### 3. Start Transcribing
 - Select a **Meeting Category** (e.g., Sales Call, Standup) to help the AI understand the context.
@@ -22,8 +22,8 @@ Welcome to **MeetScribe**, your AI-powered virtual stenographer. This guide will
 ## 📁 Testing with a Sample File
 If you don't have a live meeting right now, you can test the system using our sample file:
 
-1. **Download the Sample:** [sample-meeting.webm](https://github.com/vikramsankhala/Personal-Assistant/raw/main/sample-meeting.webm) (Right-click and "Save Link As")
-2. **Play & Capture:** 
+1. **Download the Sample:** [sample-meeting.ogg](https://upload.wikimedia.org/wikipedia/commons/d/d1/Jfk_berlin_address_high.ogg) (Right-click and "Save Link As")
+2. **Play & Capture:**
    - Open the sample file in a new browser tab.
    - In MeetScribe, select **System Audio** mode.
    - Click **Start Transcribing** and select the tab playing the sample file.
