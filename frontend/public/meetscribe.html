@@ -50,6 +50,12 @@
         .section-label { font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); margin-bottom: 20px; }
         .section-title { font-family: 'Playfair Display', serif; font-size: clamp(36px, 4vw, 56px); font-weight: 700; line-height: 1.1; letter-spacing: -1px; margin-bottom: 60px; }
 
+        /* HOW IT WORKS (THE ASK) */
+        .ask-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px; margin-top: 40px; }
+        .ask-card { background: var(--navy-mid); padding: 40px; border: 1px solid var(--border); transition: transform 0.3s; }
+        .ask-card h3 { font-family: 'Playfair Display', serif; font-size: 24px; margin-bottom: 16px; color: var(--gold); }
+        .ask-card p { color: var(--grey); line-height: 1.6; font-size: 15px; }
+
         /* PITCH DECK STYLED SECTION */
         .pitch-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px; margin-top: 40px; }
         .pitch-card { background: var(--navy-mid); padding: 40px; border: 1px solid var(--border); transition: transform 0.3s; }
@@ -87,10 +93,10 @@
     <nav>
         <a href="#" class="logo">Meet<span>Scribe</span></a>
         <ul>
+            <li><a href="#how">How it Works</a></li>
             <li><a href="#pitch">Investor Pitch</a></li>
             <li><a href="#market">Comparison</a></li>
             <li><a href="#pricing">Pricing</a></li>
-            <li><a href="#terms">Term Sheet</a></li>
         </ul>
         <a href="/transcribe" class="nav-cta">Open Application</a>
     </nav>
@@ -101,7 +107,30 @@
         <p class="hero-sub reveal">MeetScribe captures, transcribes, and understands every meeting your team ever has. Turn air into assets.</p>
         <div class="hero-actions reveal">
             <a href="/transcribe" class="btn-primary">Launch App</a>
-            <a href="#pitch" class="btn-ghost">View Pitch</a>
+            <a href="#how" class="btn-ghost">See Features</a>
+        </div>
+    </section>
+
+    <section id="how">
+        <div class="section-label reveal">The Workflow</div>
+        <h2 class="section-title reveal">Effortless Meeting Intelligence.</h2>
+        <div class="ask-grid">
+            <div class="ask-card reveal">
+                <h3>1. Zero-Effort Capture</h3>
+                <p>Just put MeetScribe on during your online meeting. Our real-time engine listens and transcribes every conversation into text instantly as you speak.</p>
+            </div>
+            <div class="ask-card reveal">
+                <h3>2. Precision Diarization</h3>
+                <p>No more anonymous text blocks. Each speaker is automatically identified and assigned to their specific parts of the conversation with millisecond accuracy.</p>
+            </div>
+            <div class="ask-card reveal">
+                <h3>3. Intelligent Minutes</h3>
+                <p>Our AI processes the transcript to generate a concise summary and structured meeting minutes, highlighting key decisions and open questions automatically.</p>
+            </div>
+            <div class="ask-card reveal">
+                <h3>4. Any Meeting, Anywhere</h3>
+                <p>Built for diversity. Use the category dropdown to tailor the AI's understanding to your specific context—whether it's a Sales Call, Daily Standup, or Board Meeting.</p>
+            </div>
         </div>
     </section>
 
