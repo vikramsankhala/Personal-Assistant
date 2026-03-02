@@ -26,7 +26,8 @@ async def init_db():
             if attempt < 5:
                 await asyncio.sleep(10)
             else:
-                raise
+                logger.error("Database unavailable - app will start but API will fail. Check DATABASE_EXTERNAL_URL and DB IP allow list.")
+                return  # Don't block startup - allows Render to detect port
 
 
 @asynccontextmanager
