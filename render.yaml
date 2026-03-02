@@ -22,3 +22,4 @@ services:
 databases:
   - name: vpa-db
     plan: free
+    region: oregon  # Must match web service region for internal DNS

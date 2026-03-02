@@ -28,7 +28,7 @@ def _clean_asyncpg_url(url: str) -> tuple[str, dict]:
 
 
 # Async (FastAPI) - ensure asyncpg for postgres, strip sslmode (Render compatibility)
-_db_url = settings.database_url
+_db_url = settings.database_url_resolved
 _db_url, _async_connect_args = _clean_asyncpg_url(_db_url)
 _async_kw = {"echo": settings.debug}
 if "sqlite" not in _db_url:

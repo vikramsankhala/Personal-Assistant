@@ -1,5 +1,7 @@
 """FastAPI application entry point."""
 
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -8,11 +10,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import transcripts, assistant, websocket
 from app.database import engine, Base
 
+logger = logging.getLogger(__name__)
+
 
 async def init_db():
     """Create tables on startup (for dev; use Alembic in production)."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    for attempt in range(6):
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            logger.info("Database tables created")
+            return
+        except Exception as e:
+            logger.warning("Database init attempt %d/6 failed: %s", attempt + 1, e)
+            if attempt < 5:
+                await asyncio.sleep(10)
+            else:
+                raise
 
 
 @asynccontextmanager

@@ -14,14 +14,21 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    # Database (Render sets DATABASE_URL; sync derived if not set)
+    # Database (Render sets DATABASE_URL; use DATABASE_EXTERNAL_URL if internal fails)
     database_url: str = "postgresql+asyncpg://user:password@localhost:5432/vpa"
     database_url_sync: str | None = None
+    database_url_external: str | None = None  # Override: external URL when internal DNS fails
+
+    @computed_field
+    @property
+    def database_url_resolved(self) -> str:
+        """Use external URL if set (Render workaround when internal DNS fails)."""
+        return self.database_url_external or self.database_url
 
     @computed_field
     @property
     def database_url_sync_resolved(self) -> str:
-        return self.database_url_sync or self.database_url.replace("+asyncpg", "")
+        return self.database_url_sync or self.database_url_resolved.replace("+asyncpg", "")
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
