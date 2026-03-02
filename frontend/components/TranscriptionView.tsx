@@ -1,5 +1,4 @@
 "use client";
-
 import { useState, useRef, useEffect } from "react";
 import { 
   Mic, 
@@ -13,7 +12,8 @@ import {
   Briefcase, 
   Zap,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  Monitor
 } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
@@ -48,25 +48,58 @@ type Transcript = {
 export function TranscriptionView() {
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [isRecording, setIsRecording] = useState(false);
+  const [captureMode, setCaptureMode] = useState<"mic" | "system">("mic");
   const [realtimeText, setRealtimeText] = useState("");
   const [selectedCategory, setSelectedCategory] = useState(MEETING_CATEGORIES[0]);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
-
+  
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   const startRealtime = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      let stream: MediaStream;
+      
+      if (captureMode === "system") {
+        // Capture system audio via screen sharing
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: { displaySurface: "browser" }, // Needed to trigger the prompt
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+        
+        // If they shared screen but didn't check "Share audio", we fail early
+        if (stream.getAudioTracks().length === 0) {
+          stream.getTracks().forEach(t => t.stop());
+          alert("System audio capture requires 'Share audio' to be checked in the popup.");
+          return;
+        }
+        
+        // Remove video tracks, we only want audio
+        stream.getVideoTracks().forEach(track => track.stop());
+      } else {
+        // Standard microphone capture
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true
+          } 
+        });
+      }
+
+      streamRef.current = stream;
       const socket = new WebSocket(`${WS_BASE}/ws/transcribe`);
       socketRef.current = socket;
 
       socket.onopen = () => {
-        // Send initial metadata about the meeting
         socket.send(JSON.stringify({ 
           type: "start", 
           category: selectedCategory.id,
-          title: `Live ${selectedCategory.label}`
+          title: `Live ${selectedCategory.label} (${captureMode === 'system' ? 'System Audio' : 'Mic'})`
         }));
 
         const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
@@ -103,21 +136,48 @@ export function TranscriptionView() {
     }
     mediaRecorderRef.current?.stop();
     socketRef.current?.close();
+    streamRef.current?.getTracks().forEach(track => track.stop());
     setIsRecording(false);
     setRealtimeText("");
   };
 
   return (
     <div className="max-w-6xl mx-auto p-8 space-y-10">
-      {/* Hero Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b pb-8">
         <div className="space-y-2">
           <h1 className="text-4xl font-black tracking-tight text-gray-900">Meeting Room</h1>
-          <p className="text-gray-500 text-lg">Real-time transcription, speaker identification, and instant minutes.</p>
+          <p className="text-gray-500 text-lg">Real-time transcription for Teams, Zoom & Meet.</p>
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Category Dropdown */}
+          {/* Capture Mode Toggle */}
+          <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200">
+            <button
+              onClick={() => setCaptureMode("mic")}
+              disabled={isRecording}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                captureMode === "mic" 
+                  ? "bg-white text-blue-600 shadow-sm" 
+                  : "text-gray-500 hover:text-gray-700"
+              } ${isRecording ? "opacity-50" : ""}`}
+            >
+              <Mic size={16} />
+              Mic
+            </button>
+            <button
+              onClick={() => setCaptureMode("system")}
+              disabled={isRecording}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                captureMode === "system" 
+                  ? "bg-white text-blue-600 shadow-sm" 
+                  : "text-gray-500 hover:text-gray-700"
+              } ${isRecording ? "opacity-50" : ""}`}
+            >
+              <Monitor size={16} />
+              System Audio
+            </button>
+          </div>
+
           <div className="relative">
             <button
               onClick={() => !isRecording && setShowCategoryDropdown(!showCategoryDropdown)}
@@ -130,7 +190,6 @@ export function TranscriptionView() {
               <span className="font-semibold text-gray-700">{selectedCategory.label}</span>
               <ChevronDown size={16} className="text-gray-400" />
             </button>
-
             {showCategoryDropdown && (
               <div className="absolute top-full mt-2 w-64 bg-white border rounded-xl shadow-xl z-50 overflow-hidden">
                 {MEETING_CATEGORIES.map((cat) => (
@@ -164,25 +223,24 @@ export function TranscriptionView() {
         </div>
       </div>
 
-      {/* Live Stream View */}
       {isRecording && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-emerald-600 font-bold">
-                <span className="flex h-3 w-3 relative">
+              <div className="flex items-center gap-2 text-emerald-600 font-bold uppercase text-xs tracking-widest">
+                <span className="flex h-2 w-2 relative">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                LIVE TRANSCRIPTION
+                Live {captureMode === 'system' ? 'System Audio' : 'Microphone'} Stream
               </div>
-              <div className="text-gray-400 text-sm flex items-center gap-1">
-                <Clock size={14} />
-                Capturing audio...
+              <div className="text-gray-400 text-xs flex items-center gap-1">
+                <Clock size={12} />
+                Capturing...
               </div>
             </div>
             <div className="min-h-[300px] p-8 bg-gray-900 rounded-3xl text-white font-mono text-lg leading-relaxed shadow-2xl border-4 border-gray-800">
-              {realtimeText || "Listening to your meeting conversations..."}
+              {realtimeText || "Listening to meeting conversations..."}
               <span className="w-2 h-6 bg-blue-500 inline-block ml-1 animate-bounce" />
             </div>
           </div>
@@ -190,17 +248,23 @@ export function TranscriptionView() {
           <div className="bg-blue-50 rounded-3xl p-8 border border-blue-100 space-y-6">
             <div className="p-4 bg-white rounded-2xl shadow-sm border border-blue-200">
               <div className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-1">Speaker Detection</div>
-              <div className="text-sm text-gray-600">Identifying participants in real-time...</div>
+              <div className="text-sm text-gray-600">Identifying participants...</div>
             </div>
             <div className="p-4 bg-white rounded-2xl shadow-sm border border-blue-200">
               <div className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-1">AI Insights</div>
-              <div className="text-sm text-gray-600">Summarizing key points as you speak...</div>
+              <div className="text-sm text-gray-600">Summarizing key points...</div>
             </div>
+            {captureMode === "system" && (
+              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
+                <p className="text-[10px] text-emerald-700 font-bold leading-tight">
+                  TIP: To capture other speakers, select the "Teams/Meet/Zoom" tab or your whole screen and ensure "Share audio" is enabled.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Transcript List */}
       <div className="space-y-8">
         <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <FileText className="text-gray-400" />
@@ -220,7 +284,6 @@ export function TranscriptionView() {
         <div className="grid grid-cols-1 gap-8">
           {transcripts.map((t) => (
             <div key={t.id} className="bg-white border rounded-3xl shadow-sm hover:shadow-xl transition-all overflow-hidden border-gray-200">
-              {/* Header */}
               <div className="p-8 bg-gray-50 border-b flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-3">
@@ -240,9 +303,7 @@ export function TranscriptionView() {
                 </div>
               </div>
 
-              {/* Content */}
               <div className="p-8 grid grid-cols-1 lg:grid-cols-2 gap-12">
-                {/* Conversation */}
                 <div className="space-y-6">
                   <div className="flex items-center gap-2 font-black text-gray-900 uppercase tracking-widest text-xs">
                     <MessageSquare size={16} className="text-blue-600" />
@@ -268,9 +329,7 @@ export function TranscriptionView() {
                   </div>
                 </div>
 
-                {/* Summary & Minutes */}
                 <div className="space-y-10">
-                  {/* Summary */}
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 font-black text-gray-900 uppercase tracking-widest text-xs">
                       <ClipboardList size={16} className="text-blue-600" />
@@ -281,7 +340,6 @@ export function TranscriptionView() {
                     </div>
                   </div>
 
-                  {/* Minutes */}
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 font-black text-gray-900 uppercase tracking-widest text-xs">
                       <Zap size={16} className="text-blue-600" />
