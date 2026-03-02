@@ -16,6 +16,8 @@ services:
         fromDatabase:
           name: vpa-db
           property: connectionString
+      - key: DATABASE_EXTERNAL_URL
+        sync: false  # Required: paste External URL from vpa-db Connect menu (internal DNS fails on Render)
       - key: SECRET_KEY
         generateValue: true
 

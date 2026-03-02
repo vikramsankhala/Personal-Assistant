@@ -5,11 +5,11 @@
 1. Go to [Render Dashboard](https://dashboard.render.com)
 2. **New** → **Blueprint**
 3. Connect your GitHub repo: `https://github.com/vikramsankhala/Personal-Assistant`
-4. Render will detect `render.yaml` and create:
-   - **vpa-backend** (Python Web Service)
-   - **vpa-db** (PostgreSQL, free tier)
+4. Render will detect `render.yaml` and create **vpa-db** (PostgreSQL) and **vpa-backend**
+5. **When prompted for `DATABASE_EXTERNAL_URL`**: Open your database's page → **Connect** → copy the **External** URL (not Internal) → paste it
+6. After deploy, copy the backend URL (e.g. `https://vpa-backend.onrender.com`)
 
-5. After deploy, copy the backend URL (e.g. `https://vpa-backend.onrender.com`)
+> **If deploy failed with "Name or service not known"**: Add `DATABASE_EXTERNAL_URL` manually: vpa-backend → Environment → Add Variable → paste the External URL from vpa-db Connect menu → Save (triggers redeploy)
 
 ## Frontend (Static Site)
 
@@ -25,10 +25,11 @@
 
 ## Troubleshooting: "Name or service not known"
 
-If the backend fails with `socket.gaierror: Name or service not known`, the internal database hostname isn't resolving. Try:
+The internal database hostname often fails to resolve on Render. **Fix**: Add `DATABASE_EXTERNAL_URL`:
 
-1. **Use external URL**: In Render Dashboard → vpa-backend → Environment → Add `DATABASE_EXTERNAL_URL` and paste the **External** connection string from your database's Connect menu (not Internal).
-2. **Check regions**: Ensure vpa-backend and vpa-db are in the same region (e.g. Oregon).
+1. vpa-db → **Connect** (top right) → copy **External** URL
+2. vpa-backend → **Environment** → Add Variable: `DATABASE_EXTERNAL_URL` = (paste the URL)
+3. **Save** (triggers redeploy)
 
 ## Optional: Redis (for Celery)
 
