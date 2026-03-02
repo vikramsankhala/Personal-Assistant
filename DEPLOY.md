@@ -1,6 +1,20 @@
 # Deploy to Render
 
-## Backend (Web Service)
+## Single URL (Frontend + Backend)
+
+One deployment serves both the web app and API at the same URL.
+
+**Render Web Service settings:**
+- **Root Directory:** (empty)
+- **Docker Build Context Directory:** `.`
+- **Dockerfile Path:** `./Dockerfile`
+- **Environment:** `DATABASE_EXTERNAL_URL` = your Postgres External URL
+
+The root `Dockerfile` builds the frontend and backend together. Visit your service URL for the app; `/api` and `/docs` for the API.
+
+---
+
+## Backend Only (Web Service)
 
 1. Go to [Render Dashboard](https://dashboard.render.com)
 2. **New** → **Blueprint**

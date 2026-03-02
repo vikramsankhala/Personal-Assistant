@@ -2,15 +2,19 @@
 
 import asyncio
 import logging
-from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from app.api.routes import transcripts, assistant, websocket
 from app.database import engine, Base
 
 logger = logging.getLogger(__name__)
+
+STATIC_DIR = Path(__file__).parent.parent.parent / "static"
 
 
 async def init_db():
@@ -57,15 +61,32 @@ app.include_router(assistant.router, prefix="/api")
 app.include_router(websocket.router)
 
 
-@app.get("/")
-async def root():
-    return {
-        "name": "VPA - Virtual Stenographer & Personal Assistant",
-        "docs": "/docs",
-        "api": "/api",
-    }
-
-
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+# Serve frontend static files when available (unified deployment)
+if STATIC_DIR.exists():
+    app.mount("/_next", StaticFiles(directory=STATIC_DIR / "_next"), name="next")
+    app.mount("/_next/static", StaticFiles(directory=STATIC_DIR / "_next" / "static"), name="next-static")
+
+    @app.get("/")
+    async def root():
+        return FileResponse(STATIC_DIR / "index.html")
+
+    @app.get("/{path:path}")
+    async def serve_spa(path: str):
+        """Serve SPA - return index.html for client-side routes."""
+        file_path = STATIC_DIR / path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        return FileResponse(STATIC_DIR / "index.html")
+else:
+    @app.get("/")
+    async def root():
+        return {
+            "name": "VPA - Virtual Stenographer & Personal Assistant",
+            "docs": "/docs",
+            "api": "/api",
+        }
