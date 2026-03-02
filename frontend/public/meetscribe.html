@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MeetScribe | Your meetings, transcribed and understood.</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --navy: #0A1628;
+            --navy-mid: #0F2040;
+            --blue: #1B5FD4;
+            --blue-bright: #3B82F6;
+            --gold: #C9A84C;
+            --gold-light: #E8C97A;
+            --white: #F8F6F1;
+            --grey: #8A94A6;
+            --border: rgba(255,255,255,0.07);
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+        body { background: var(--navy); color: var(--white); font-family: 'DM Sans', sans-serif; font-weight: 300; overflow-x: hidden; }
+
+        /* NAV */
+        nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; padding: 24px 60px; background: linear-gradient(to bottom, rgba(10,22,40,0.95), transparent); backdrop-filter: blur(2px); }
+        .logo { font-family: 'Playfair Display', serif; font-weight: 700; font-size: 22px; letter-spacing: -0.5px; color: var(--white); text-decoration: none; }
+        .logo span { color: var(--gold); }
+        nav ul { display: flex; gap: 36px; list-style: none; }
+        nav ul li a { font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 400; letter-spacing: 0.08em; color: var(--grey); text-decoration: none; text-transform: uppercase; transition: color 0.2s; }
+        nav ul li a:hover { color: var(--white); }
+        .nav-cta { font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; background: var(--gold); color: var(--navy); padding: 10px 22px; border: none; cursor: pointer; font-weight: 500; transition: all 0.2s; text-decoration: none; }
+        .nav-cta:hover { background: var(--gold-light); transform: translateY(-1px); }
+
+        /* HERO */
+        .hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: 140px 60px 80px; position: relative; overflow: hidden; }
+        .hero-bg { position: absolute; inset: 0; z-index: 0; background: radial-gradient(ellipse 80% 60% at 70% 40%, rgba(27,95,212,0.12) 0%, transparent 70%), radial-gradient(ellipse 40% 40% at 20% 80%, rgba(201,168,76,0.06) 0%, transparent 60%); }
+        .hero h1 { font-family: 'Playfair Display', serif; font-size: clamp(52px, 7vw, 96px); font-weight: 900; line-height: 1.0; letter-spacing: -2px; max-width: 800px; position: relative; z-index: 1; }
+        .hero h1 em { font-style: italic; color: var(--gold); }
+        .hero-sub { margin-top: 32px; font-size: 18px; font-weight: 300; color: var(--grey); max-width: 460px; line-height: 1.65; position: relative; z-index: 1; }
+        .hero-actions { display: flex; gap: 16px; margin-top: 48px; position: relative; z-index: 1; }
+
+        .btn-primary { background: var(--gold); color: var(--navy); font-family: 'DM Mono', monospace; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 500; padding: 16px 36px; border: none; cursor: pointer; transition: all 0.2s; text-decoration: none; display: inline-block; }
+        .btn-primary:hover { background: var(--gold-light); transform: translateY(-2px); }
+        .btn-ghost { background: transparent; color: var(--grey); font-family: 'DM Mono', monospace; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; padding: 16px 36px; border: 1px solid var(--border); cursor: pointer; transition: all 0.2s; text-decoration: none; display: inline-block; }
+        .btn-ghost:hover { border-color: rgba(255,255,255,0.2); color: var(--white); }
+
+        /* SECTIONS */
+        section { padding: 120px 60px; position: relative; border-bottom: 1px solid var(--border); }
+        .section-label { font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); margin-bottom: 20px; }
+        .section-title { font-family: 'Playfair Display', serif; font-size: clamp(36px, 4vw, 56px); font-weight: 700; line-height: 1.1; letter-spacing: -1px; margin-bottom: 60px; }
+
+        /* PITCH DECK STYLED SECTION */
+        .pitch-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px; margin-top: 40px; }
+        .pitch-card { background: var(--navy-mid); padding: 40px; border: 1px solid var(--border); transition: transform 0.3s; }
+        .pitch-card h3 { font-family: 'Playfair Display', serif; font-size: 24px; margin-bottom: 16px; color: var(--gold); }
+        .pitch-card p { color: var(--grey); line-height: 1.6; font-size: 15px; }
+
+        /* COMPARISON TABLE */
+        .table-container { overflow-x: auto; margin-top: 40px; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th, td { padding: 20px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { font-family: 'DM Mono', monospace; color: var(--gold); text-transform: uppercase; letter-spacing: 0.1em; }
+        .highlight { color: var(--blue-bright); font-weight: 500; }
+
+        /* PRICING */
+        .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); }
+        .price-card { background: var(--navy); padding: 60px 40px; text-align: center; }
+        .price-card.featured { background: var(--navy-mid); position: relative; }
+        .price-card.featured::after { content: 'Best Value'; position: absolute; top: 0; left: 50%; transform: translate(-50%, -50%); background: var(--gold); color: var(--navy); padding: 4px 12px; font-family: 'DM Mono', monospace; font-size: 10px; text-transform: uppercase; }
+        .price-val { font-family: 'Playfair Display', serif; font-size: 48px; font-weight: 700; margin: 20px 0; }
+        .price-val span { font-size: 16px; color: var(--grey); font-family: 'DM Sans', sans-serif; font-weight: 300; }
+        .price-features { list-style: none; margin-bottom: 40px; color: var(--grey); font-size: 14px; line-height: 2.5; }
+
+        footer { padding: 80px 60px 40px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .footer-logo { font-family: 'Playfair Display', serif; font-weight: 700; font-size: 18px; color: var(--white); text-decoration: none; }
+        .footer-logo span { color: var(--gold); }
+        
+        .reveal { opacity: 0; transform: translateY(30px); transition: all 0.8s ease; }
+        .reveal.visible { opacity: 1; transform: translateY(0); }
+
+        .term-sheet { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--grey); line-height: 1.8; background: #050b14; padding: 40px; border-left: 2px solid var(--gold); }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <a href="#" class="logo">Meet<span>Scribe</span></a>
+        <ul>
+            <li><a href="#pitch">Investor Pitch</a></li>
+            <li><a href="#market">Comparison</a></li>
+            <li><a href="#pricing">Pricing</a></li>
+            <li><a href="#terms">Term Sheet</a></li>
+        </ul>
+        <a href="/transcribe" class="nav-cta">Open Application</a>
+    </nav>
+
+    <section class="hero">
+        <div class="hero-bg"></div>
+        <h1 class="reveal">The future of memory is <em>searchable.</em></h1>
+        <p class="hero-sub reveal">MeetScribe captures, transcribes, and understands every meeting your team ever has. Turn air into assets.</p>
+        <div class="hero-actions reveal">
+            <a href="/transcribe" class="btn-primary">Launch App</a>
+            <a href="#pitch" class="btn-ghost">View Pitch</a>
+        </div>
+    </section>
+
+    <section id="pitch">
+        <div class="section-label reveal">The Opportunity</div>
+        <h2 class="section-title reveal">Investor Pitch: The Intelligence Layer for Modern Teams.</h2>
+        <div class="pitch-grid">
+            <div class="pitch-card reveal">
+                <h3>The Problem</h3>
+                <p>Knowledge loss is the hidden tax on every organization. 70% of meeting content is forgotten within 24 hours. Decisions are made, then lost in translation or lack of documentation.</p>
+            </div>
+            <div class="pitch-card reveal">
+                <h3>The Solution</h3>
+                <p>A real-time AI transcription and diarization engine that doesn't just record audio—it builds a structured knowledge graph of your company's verbal history.</p>
+            </div>
+            <div class="pitch-card reveal">
+                <h3>Tech Moat</h3>
+                <p>Proprietary WebSocket streaming for zero-latency feedback, combined with multi-model speaker diarization and custom LLM fine-tuning for meeting summaries.</p>
+            </div>
+            <div class="pitch-card reveal">
+                <h3>Market Size</h3>
+                <p>The global transcription market is projected to reach $11B by 2030. MeetScribe targets the $3B enterprise communication segment with a focus on data privacy.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="market">
+        <div class="section-label reveal">Competitive Landscape</div>
+        <h2 class="section-title reveal">Why MeetScribe Wins Globally.</h2>
+        <div class="table-container reveal">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th class="highlight">MeetScribe</th>
+                        <th>Otter.ai</th>
+                        <th>Fireflies</th>
+                        <th>Zoom AI</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Real-time Streaming</td>
+                        <td class="highlight">Yes (WebSocket)</td>
+                        <td>Limited</td>
+                        <td>No</td>
+                        <td>In-meeting only</td>
+                    </tr>
+                    <tr>
+                        <td>Speaker Diarization</td>
+                        <td class="highlight">High Precision</td>
+                        <td>Standard</td>
+                        <td>Standard</td>
+                        <td>Basic</td>
+                    </tr>
+                    <tr>
+                        <td>Custom Summaries</td>
+                        <td class="highlight">Action-Oriented</td>
+                        <td>General</td>
+                        <td>General</td>
+                        <td>Basic</td>
+                    </tr>
+                    <tr>
+                        <td>Data Residency</td>
+                        <td class="highlight">Private/Self-Host</td>
+                        <td>SaaS only</td>
+                        <td>SaaS only</td>
+                        <td>SaaS only</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section id="pricing">
+        <div class="section-label reveal">Packaging</div>
+        <h2 class="section-title reveal">Scalable Pricing for Every Growth Stage.</h2>
+        <div class="pricing-grid reveal">
+            <div class="price-card">
+                <h3>Starter</h3>
+                <div class="price-val">$0<span>/forever</span></div>
+                <ul class="price-features">
+                    <li>300 mins/month</li>
+                    <li>Basic Diarization</li>
+                    <li>Shared Workspace</li>
+                </ul>
+                <a href="/transcribe" class="btn-ghost">Start Free</a>
+            </div>
+            <div class="price-card featured">
+                <h3>Pro</h3>
+                <div class="price-val">$19<span>/user/mo</span></div>
+                <ul class="price-features">
+                    <li>Unlimited Minutes</li>
+                    <li>Advanced AI Summaries</li>
+                    <li>Real-time Live Stream</li>
+                    <li>Action Item Tracking</li>
+                </ul>
+                <a href="/transcribe" class="btn-primary">Go Pro</a>
+            </div>
+            <div class="price-card">
+                <h3>Enterprise</h3>
+                <div class="price-val">Custom</div>
+                <ul class="price-features">
+                    <li>Self-Hosted Option</li>
+                    <li>SSO & RBAC</li>
+                    <li>Dedicated GPU Instance</li>
+                    <li>API Access</li>
+                </ul>
+                <a href="mailto:sales@meetscribe.com" class="btn-ghost">Contact Sales</a>
+            </div>
+        </div>
+    </section>
+
+    <section id="terms">
+        <div class="section-label reveal">Legal Framework</div>
+        <h2 class="section-title reveal">Investor Term Sheet (Summary).</h2>
+        <div class="term-sheet reveal">
+            [CONFIDENTIAL - SEED ROUND SUMMARY]<br><br>
+            • PRE-MONEY VALUATION: $8,000,000 USD<br>
+            • FUNDING TARGET: $1,200,000 USD<br>
+            • INSTRUMENT: SAFE (Simple Agreement for Future Equity)<br>
+            • VALUATION CAP: $12,000,000 USD<br>
+            • DISCOUNT: 20%<br>
+            • BOARD SEATS: Founders maintain 2/3 control.<br>
+            • DATA RIGHTS: MeetScribe maintains IP on diarization algorithms.
+        </div>
+    </section>
+
+    <footer>
+        <a href="#" class="footer-logo">Meet<span>Scribe</span></a>
+        <div class="footer-tagline">Turn air into assets.</div>
+    </footer>
+
+    <script>
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((e, idx) => {
+                if (e.isIntersecting) {
+                    setTimeout(() => {
+                        e.target.classList.add('visible');
+                    }, idx * 80);
+                    observer.unobserve(e.target);
+                }
+            });
+        }, { threshold: 0.15 });
+
+        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+    </script>
+</body>
+</html>
