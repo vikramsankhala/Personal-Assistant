@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { Upload, Mic, Download, Loader2 } from "lucide-react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { Upload, Mic, Download, Loader2, StopCircle, Play, FileAudio, User, MessageSquare, ClipboardList } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+const WS_BASE = API_BASE.replace("http", "ws");
 
 type TranscriptSegment = {
   speaker_id: string;
@@ -23,201 +24,177 @@ type Transcript = {
 };
 
 export function TranscriptionView() {
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [transcript, setTranscript] = useState<Transcript | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [transcripts, setTranscripts] = useState<Transcript[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [realtimeText, setRealtimeText] = useState("");
+  
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const socketRef = useRef<WebSocket | null>(null);
 
-  const handleUpload = useCallback(async () => {
+  const startRealtime = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const socket = new WebSocket(`${WS_BASE}/api/transcribe/ws`);
+      socketRef.current = socket;
+
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === "partial") {
+          setRealtimeText(prev => prev + " " + data.text);
+        }
+      };
+
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0 && socket.readyState === WebSocket.OPEN) {
+          socket.send(event.data);
+        }
+      };
+
+      mediaRecorder.start(500); // Send chunks every 500ms
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Failed to start recording", err);
+    }
+  };
+
+  const stopRealtime = () => {
+    mediaRecorderRef.current?.stop();
+    socketRef.current?.close();
+    setIsRecording(false);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (!file) return;
-    setError(null);
-    setUploading(true);
-    setTranscript(null);
 
+    setLoading(true);
     const formData = new FormData();
     formData.append("file", file);
 
     try {
-      const res = await fetch(`${API_BASE}/api/transcripts/upload`, {
+      const res = await fetch(`${API_BASE}/api/transcribe/upload`, {
         method: "POST",
         body: formData,
       });
-      if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      setTranscript(data);
-
-      // Poll for completion
-      if (data.status === "processing") {
-        const poll = async () => {
-          const r = await fetch(`${API_BASE}/api/transcripts/${data.id}`);
-          const t = await r.json();
-          setTranscript(t);
-          if (t.status === "processing") setTimeout(poll, 2000);
-        };
-        setTimeout(poll, 2000);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed");
+      setTranscripts(prev => [data, ...prev]);
+    } catch (err) {
+      console.error("Upload failed", err);
     } finally {
-      setUploading(false);
+      setLoading(false);
     }
-  }, [file]);
-
-  const handleExport = async (format: string) => {
-    if (!transcript) return;
-    window.open(
-      `${API_BASE}/api/transcripts/${transcript.id}/export?format=${format}`,
-      "_blank"
-    );
   };
 
   return (
-    <div className="space-y-8">
-      {/* Upload zone */}
-      <div className="rounded-2xl border border-ink-700/50 bg-ink-800/30 p-8">
-        <h2 className="text-lg font-semibold text-ink-100 mb-4 flex items-center gap-2">
-          <Upload className="w-5 h-5 text-accent" />
-          Upload Audio
-        </h2>
-        <p className="text-sm text-ink-400 mb-4">
-          MP3, WAV, M4A, OGG, FLAC — up to 100MB. Supports speaker diarization.
-        </p>
-
-        <div
-          className={`border-2 border-dashed rounded-xl p-12 text-center transition-colors ${
-            file
-              ? "border-accent/50 bg-accent/5"
-              : "border-ink-600 hover:border-ink-500"
-          }`}
-        >
-          <input
-            type="file"
-            accept=".mp3,.wav,.m4a,.ogg,.flac,.webm"
-            onChange={(e) => setFile(e.target.files?.[0] || null)}
-            className="hidden"
-            id="file-upload"
-          />
-          <label htmlFor="file-upload" className="cursor-pointer block">
-            {file ? (
-              <p className="text-ink-200 font-medium">{file.name}</p>
-            ) : (
-              <p className="text-ink-400">
-                Drag and drop or <span className="text-accent">browse</span>
-              </p>
-            )}
+    <div className="max-w-4xl mx-auto p-6 space-y-8">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Transcription</h1>
+        <div className="flex gap-4">
+          <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700 transition-colors">
+            <Upload size={20} />
+            <span>Upload Audio</span>
+            <input type="file" className="hidden" accept="audio/*" onChange={handleFileUpload} />
           </label>
           <button
-            onClick={handleUpload}
-            disabled={!file || uploading}
-            className="mt-4 px-6 py-2.5 rounded-lg bg-accent hover:bg-accent-hover text-white font-medium disabled:opacity-50 flex items-center gap-2 mx-auto"
+            onClick={isRecording ? stopRealtime : startRealtime}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+              isRecording ? "bg-red-600 hover:bg-red-700 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"
+            }`}
           >
-            {uploading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Processing…
-              </>
-            ) : (
-              "Transcribe"
-            )}
+            {isRecording ? <StopCircle size={20} /> : <Mic size={20} />}
+            <span>{isRecording ? "Stop Recording" : "Live Transcribe"}</span>
           </button>
         </div>
-
-        {error && (
-          <p className="mt-4 text-sm text-red-400">{error}</p>
-        )}
       </div>
 
-      {/* Live transcription placeholder */}
-      <div className="rounded-2xl border border-ink-700/50 bg-ink-800/30 p-8 opacity-75">
-        <h2 className="text-lg font-semibold text-ink-100 mb-4 flex items-center gap-2">
-          <Mic className="w-5 h-5 text-accent" />
-          Live Transcription
-        </h2>
-        <p className="text-sm text-ink-400">
-          Connect a microphone for real-time transcription via WebSocket. Coming soon.
-        </p>
-      </div>
-
-      {/* Transcript result */}
-      {transcript && (
-        <div className="rounded-2xl border border-ink-700/50 bg-ink-800/30 p-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-ink-100">{transcript.title}</h2>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleExport("json")}
-                className="px-3 py-1.5 rounded-lg bg-ink-700 text-ink-200 text-sm hover:bg-ink-600 flex items-center gap-1"
-              >
-                <Download className="w-4 h-4" />
-                JSON
-              </button>
-              <button
-                onClick={() => handleExport("markdown")}
-                className="px-3 py-1.5 rounded-lg bg-ink-700 text-ink-200 text-sm hover:bg-ink-600 flex items-center gap-1"
-              >
-                <Download className="w-4 h-4" />
-                Markdown
-              </button>
-              <button
-                onClick={() => handleExport("srt")}
-                className="px-3 py-1.5 rounded-lg bg-ink-700 text-ink-200 text-sm hover:bg-ink-600 flex items-center gap-1"
-              >
-                <Download className="w-4 h-4" />
-                SRT
-              </button>
-            </div>
+      {isRecording && (
+        <div className="p-4 bg-gray-50 border rounded-xl animate-pulse">
+          <div className="flex items-center gap-2 text-emerald-600 font-medium mb-2">
+            <div className="w-2 h-2 bg-emerald-600 rounded-full animate-ping" />
+            Listening...
           </div>
-
-          {transcript.status === "processing" && (
-            <div className="flex items-center gap-2 text-ink-400 mb-4">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Processing audio… (ASR → Diarization → Summarization)
-            </div>
-          )}
-
-          {transcript.summary && (
-            <div className="mb-6 p-4 rounded-xl bg-ink-800/50">
-              <h3 className="text-sm font-medium text-ink-300 mb-2">Summary</h3>
-              <p className="text-ink-200">{transcript.summary}</p>
-            </div>
-          )}
-
-          {transcript.action_items && transcript.action_items.length > 0 && (
-            <div className="mb-6 p-4 rounded-xl bg-ink-800/50">
-              <h3 className="text-sm font-medium text-ink-300 mb-2">Action Items</h3>
-              <ul className="list-disc list-inside text-ink-200 space-y-1">
-                {transcript.action_items.map((item, i) => (
-                  <li key={i}>{item}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <div className="space-y-3">
-            <h3 className="text-sm font-medium text-ink-300">Transcript</h3>
-            {transcript.segments?.length ? (
-              transcript.segments.map((seg, i) => (
-                <div
-                  key={i}
-                  className="flex gap-4 p-3 rounded-lg bg-ink-800/30 hover:bg-ink-800/50"
-                >
-                  <span className="text-xs text-accent font-mono shrink-0 w-24">
-                    {seg.start_time.toFixed(1)}s
-                  </span>
-                  <span className="text-xs text-ink-500 shrink-0">
-                    {seg.speaker_id}
-                  </span>
-                  <p className="text-ink-200">{seg.text}</p>
-                </div>
-              ))
-            ) : transcript.full_text ? (
-              <p className="text-ink-200 whitespace-pre-wrap">{transcript.full_text}</p>
-            ) : (
-              <p className="text-ink-500">No transcript yet.</p>
-            )}
-          </div>
+          <p className="text-gray-700 italic">{realtimeText || "Waiting for speech..."}</p>
         </div>
       )}
+
+      {loading && (
+        <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+          <Loader2 className="animate-spin mb-4" size={48} />
+          <p className="text-lg">Processing your audio with AI...</p>
+        </div>
+      )}
+
+      <div className="space-y-6">
+        {transcripts.map((t) => (
+          <div key={t.id} className="bg-white border rounded-xl shadow-sm overflow-hidden">
+            <div className="p-6 border-b bg-gray-50 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <FileAudio className="text-blue-600" size={20} />
+                  {t.title}
+                </h3>
+                <span className="text-sm text-gray-500">Status: {t.status}</span>
+              </div>
+              <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
+                <Download size={20} />
+              </button>
+            </div>
+            
+            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 font-medium text-gray-900 border-b pb-2">
+                  <MessageSquare size={18} />
+                  Transcript & Speakers
+                </div>
+                <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                  {t.segments.map((s, i) => (
+                    <div key={i} className="flex gap-3">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                        <User size={16} className="text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
+                          <span className="font-bold text-gray-700">Speaker {s.speaker_id}</span>
+                          <span>•</span>
+                          <span>{Math.floor(s.start_time)}s</span>
+                        </div>
+                        <p className="text-sm text-gray-800 leading-relaxed">{s.text}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                {t.summary && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 font-medium text-gray-900 border-b pb-2">
+                      <ClipboardList size={18} />
+                      AI Summary
+                    </div>
+                    <p className="text-sm text-gray-700 leading-relaxed">{t.summary}</p>
+                  </div>
+                )}
+                
+                {t.action_items && t.action_items.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="font-medium text-gray-900">Action Items</div>
+                    <ul className="list-disc list-inside space-y-1">
+                      {t.action_items.map((item, i) => (
+                        <li key={i} className="text-sm text-gray-700">{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
