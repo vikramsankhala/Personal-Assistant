@@ -86,7 +86,14 @@
         .reveal.visible { opacity: 1; transform: translateY(0); }
 
         .term-sheet { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--grey); line-height: 1.8; background: #050b14; padding: 40px; border-left: 2px solid var(--gold); }
-    </style>
+        /* Founder section */
+        footer { position: relative; }
+        .founder-strip { display: flex; align-items: center; gap: 14px; border-top: 1px solid var(--border); padding: 24px 60px; background: var(--navy); }
+        .founder-photo { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; border: 2px solid var(--gold); flex-shrink: 0; }
+        .founder-info { display: flex; flex-direction: column; }
+        .founder-name { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 700; color: var(--white); }
+        .founder-role { font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.1em; color: var(--grey); margin-top: 2px; }
+</style>
 </head>
 <body>
 
@@ -296,6 +303,13 @@
 ooter>
         <a href="#" class="footer-logo">Meet<span>Scribe</span></a>
         <div class="footer-tagline">Turn air into assets.</div>
+    <div class="founder-strip">
+      <img src="https://github.com/vikramsankhala.png" alt="Vikram Sankhala, Founder" class="founder-photo" >
+      <div class="founder-info">
+        <span class="founder-name">Vikram Sankhala</span>
+        <span class="founder-role">Founder &amp; CEO · IIT · IIM · Ex-IRS</span>
+      </div>
+    </div>
     </footer>
 
     <script>
