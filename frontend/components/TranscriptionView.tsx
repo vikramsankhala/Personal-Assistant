@@ -10,10 +10,13 @@ import {
   ChevronDown, 
   Globe, 
   Briefcase, 
-  Zap,
-  Clock,
-  CheckCircle2,
-  Monitor
+  Zap, 
+  Clock, 
+  CheckCircle2, 
+  Monitor,
+  Download,
+  Phone,
+  MessageCircle
 } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
@@ -48,7 +51,7 @@ type Transcript = {
 export function TranscriptionView() {
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [isRecording, setIsRecording] = useState(false);
-  const [captureMode, setCaptureMode] = useState<"mic" | "system">("mic");
+  const [captureMode, setCaptureMode] = useState<"mic" | "system" | "mobile" | "whatsapp">("mic");
   const [realtimeText, setRealtimeText] = useState("");
   const [selectedCategory, setSelectedCategory] = useState(MEETING_CATEGORIES[0]);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
@@ -62,32 +65,19 @@ export function TranscriptionView() {
       let stream: MediaStream;
       
       if (captureMode === "system") {
-        // Capture system audio via screen sharing
         stream = await navigator.mediaDevices.getDisplayMedia({
-          video: { displaySurface: "browser" }, // Needed to trigger the prompt
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          }
+          video: { displaySurface: "browser" },
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
         });
-        
-        // If they shared screen but didn't check "Share audio", we fail early
         if (stream.getAudioTracks().length === 0) {
           stream.getTracks().forEach(t => t.stop());
           alert("System audio capture requires 'Share audio' to be checked in the popup.");
           return;
         }
-        
-        // Remove video tracks, we only want audio
         stream.getVideoTracks().forEach(track => track.stop());
       } else {
-        // Standard microphone capture
-        stream = await navigator.mediaDevices.getUserMedia({ 
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true
-          } 
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true }
         });
       }
 
@@ -96,21 +86,23 @@ export function TranscriptionView() {
       socketRef.current = socket;
 
       socket.onopen = () => {
-        socket.send(JSON.stringify({ 
-          type: "start", 
+        let modeLabel = captureMode.charAt(0).toUpperCase() + captureMode.slice(1);
+        if (captureMode === 'whatsapp') modeLabel = "WhatsApp";
+        
+        socket.send(JSON.stringify({
+          type: "start",
           category: selectedCategory.id,
-          title: `Live ${selectedCategory.label} (${captureMode === 'system' ? 'System Audio' : 'Mic'})`
+          title: `Live ${selectedCategory.label} (${modeLabel} Audio)`
         }));
 
         const mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
         mediaRecorderRef.current = mediaRecorder;
-
+        
         mediaRecorder.ondataavailable = (event) => {
           if (event.data.size > 0 && socket.readyState === WebSocket.OPEN) {
             socket.send(event.data);
           }
         };
-
         mediaRecorder.start(1000);
       };
 
@@ -141,57 +133,103 @@ export function TranscriptionView() {
     setRealtimeText("");
   };
 
+  const downloadTranscript = (transcript: Transcript) => {
+    let content = `MEETSCRIBE TRANSCRIPT: ${transcript.title}
+`;
+    content += `Date: ${new Date(transcript.created_at).toLocaleString()}
+`;
+    content += `Category: ${transcript.category}
+`;
+    content += `------------------------------------------
+
+`;
+    
+    if (transcript.summary) {
+      content += `EXECUTIVE SUMMARY:
+${transcript.summary}
+
+`;
+    }
+    
+    if (transcript.minutes && transcript.minutes.length > 0) {
+      content += `MEETING MINUTES:
+`;
+      transcript.minutes.forEach(m => content += `- ${m}
+`);
+      content += `
+`;
+    }
+    
+    content += `FULL CONVERSATION:
+`;
+    transcript.segments.forEach(s => {
+      content += `[${s.speaker_id}] ${s.text}
+`;
+    });
+
+    const blob = new Blob([content], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${transcript.title.replace(/\s+/g, '_')}_transcript.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="max-w-6xl mx-auto p-8 space-y-10">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b pb-8">
-        <div className="space-y-2">
-          <h1 className="text-4xl font-black tracking-tight text-gray-900">Meeting Room</h1>
-          <p className="text-gray-500 text-lg">Real-time transcription for Teams, Zoom & Meet.</p>
+    <div className="flex-1 overflow-auto bg-slate-50 custom-scrollbar">
+      <div className="max-w-4xl mx-auto px-6 py-10">
+        <div className="mb-10 text-center">
+          <h2 className="text-3xl font-bold text-slate-900 mb-2">Meeting Room</h2>
+          <p className="text-slate-500">Real-time transcription for Teams, Zoom, WhatsApp & Calls.</p>
         </div>
 
-        <div className="flex items-center gap-4">
-          {/* Capture Mode Toggle */}
-          <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200">
-            <button
-              onClick={() => setCaptureMode("mic")}
-              disabled={isRecording}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                captureMode === "mic" 
-                  ? "bg-white text-blue-600 shadow-sm" 
-                  : "text-gray-500 hover:text-gray-700"
-              } ${isRecording ? "opacity-50" : ""}`}
-            >
-              <Mic size={16} />
-              Mic
-            </button>
-            <button
-              onClick={() => setCaptureMode("system")}
-              disabled={isRecording}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                captureMode === "system" 
-                  ? "bg-white text-blue-600 shadow-sm" 
-                  : "text-gray-500 hover:text-gray-700"
-              } ${isRecording ? "opacity-50" : ""}`}
-            >
-              <Monitor size={16} />
-              System Audio
-            </button>
+        {/* Capture Mode Toggle */}
+        <div className="mb-8 flex justify-center">
+          <div className="inline-flex p-1 bg-slate-200/50 rounded-xl">
+            {[
+              { id: 'mic', label: 'Mic', icon: Mic },
+              { id: 'system', label: 'System Audio', icon: Monitor },
+              { id: 'mobile', label: 'Mobile Audio', icon: Phone },
+              { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle },
+            ].map((mode) => (
+              <button
+                key={mode.id}
+                onClick={() => setCaptureMode(mode.id as any)}
+                disabled={isRecording}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                  captureMode === mode.id
+                    ? "bg-white text-blue-600 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                } ${isRecording ? "opacity-50" : ""}`}
+              >
+                <mode.icon className="w-4 h-4" />
+                {mode.label}
+              </button>
+            ))}
           </div>
+        </div>
 
-          <div className="relative">
+        <div className="flex flex-col md:flex-row items-center justify-center gap-4 mb-12">
+          {/* Category Selector */}
+          <div className="relative w-full md:w-64">
             <button
               onClick={() => !isRecording && setShowCategoryDropdown(!showCategoryDropdown)}
               disabled={isRecording}
-              className={`flex items-center gap-3 px-5 py-3 bg-white border rounded-xl shadow-sm transition-all ${
+              className={`w-full flex items-center justify-between px-5 py-3 bg-white border rounded-xl shadow-sm transition-all ${
                 isRecording ? "opacity-50 cursor-not-allowed" : "hover:border-blue-400 hover:shadow-md"
               }`}
             >
-              <selectedCategory.icon size={20} className="text-blue-600" />
-              <span className="font-semibold text-gray-700">{selectedCategory.label}</span>
-              <ChevronDown size={16} className="text-gray-400" />
+              <div className="flex items-center gap-3">
+                <selectedCategory.icon className="w-5 h-5 text-blue-500" />
+                <span className="font-medium text-slate-700">{selectedCategory.label}</span>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
             </button>
             {showCategoryDropdown && (
-              <div className="absolute top-full mt-2 w-64 bg-white border rounded-xl shadow-xl z-50 overflow-hidden">
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white border rounded-xl shadow-xl z-10 overflow-hidden">
                 {MEETING_CATEGORIES.map((cat) => (
                   <button
                     key={cat.id}
@@ -199,10 +237,10 @@ export function TranscriptionView() {
                       setSelectedCategory(cat);
                       setShowCategoryDropdown(false);
                     }}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-blue-50 text-left transition-colors"
                   >
-                    <cat.icon size={18} className="text-gray-400" />
-                    <span className="text-sm font-medium text-gray-700">{cat.label}</span>
+                    <cat.icon className="w-4 h-4 text-slate-400" />
+                    <span className="text-sm font-medium text-slate-700">{cat.label}</span>
                   </button>
                 ))}
               </div>
@@ -211,161 +249,186 @@ export function TranscriptionView() {
 
           <button
             onClick={isRecording ? stopRealtime : startRealtime}
-            className={`flex items-center gap-3 px-8 py-3 rounded-xl font-bold transition-all shadow-lg hover:shadow-xl ${
-              isRecording
-                ? "bg-red-600 hover:bg-red-700 text-white animate-pulse"
-                : "bg-black hover:bg-gray-800 text-white"
+            className={`w-full md:w-auto flex items-center justify-center gap-3 px-10 py-3 rounded-xl font-bold text-white transition-all shadow-lg ${
+              isRecording 
+                ? "bg-rose-500 hover:bg-rose-600 animate-pulse" 
+                : "bg-blue-600 hover:bg-blue-700 hover:-translate-y-0.5"
             }`}
           >
-            {isRecording ? <StopCircle size={22} /> : <Mic size={22} />}
+            {isRecording ? <StopCircle className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
             {isRecording ? "End Meeting" : "Start Transcribing"}
           </button>
         </div>
-      </div>
 
-      {isRecording && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-emerald-600 font-bold uppercase text-xs tracking-widest">
-                <span className="flex h-2 w-2 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+        {isRecording && (
+          <div className="mb-12 p-8 bg-white rounded-2xl shadow-xl border border-blue-100 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 bg-rose-500 rounded-full animate-ping" />
+                <span className="text-sm font-bold text-slate-400 uppercase tracking-wider">
+                  Live {captureMode === 'system' ? 'System Audio' : captureMode === 'whatsapp' ? 'WhatsApp' : captureMode.charAt(0).toUpperCase() + captureMode.slice(1)} Stream
                 </span>
-                Live {captureMode === 'system' ? 'System Audio' : 'Microphone'} Stream
               </div>
-              <div className="text-gray-400 text-xs flex items-center gap-1">
-                <Clock size={12} />
-                Capturing...
-              </div>
+              <span className="text-xs font-medium text-slate-400">Capturing...</span>
             </div>
-            <div className="min-h-[300px] p-8 bg-gray-900 rounded-3xl text-white font-mono text-lg leading-relaxed shadow-2xl border-4 border-gray-800">
+            
+            <div className="min-h-[200px] p-6 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-600 leading-relaxed mb-8">
               {realtimeText || "Listening to meeting conversations..."}
-              <span className="w-2 h-6 bg-blue-500 inline-block ml-1 animate-bounce" />
             </div>
-          </div>
-          
-          <div className="bg-blue-50 rounded-3xl p-8 border border-blue-100 space-y-6">
-            <div className="p-4 bg-white rounded-2xl shadow-sm border border-blue-200">
-              <div className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-1">Speaker Detection</div>
-              <div className="text-sm text-gray-600">Identifying participants...</div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <User className="w-4 h-4 text-blue-500" />
+                  <span className="text-sm font-bold text-blue-900">Speaker Detection</span>
+                </div>
+                <p className="text-xs text-blue-700">Identifying participants...</p>
+              </div>
+              <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <Zap className="w-4 h-4 text-amber-500" />
+                  <span className="text-sm font-bold text-amber-900">AI Insights</span>
+                </div>
+                <p className="text-xs text-amber-700">Summarizing key points...</p>
+              </div>
             </div>
-            <div className="p-4 bg-white rounded-2xl shadow-sm border border-blue-200">
-              <div className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-1">AI Insights</div>
-              <div className="text-sm text-gray-600">Summarizing key points...</div>
-            </div>
-            {captureMode === "system" && (
-              <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
-                <p className="text-[10px] text-emerald-700 font-bold leading-tight">
-                  TIP: To capture other speakers, select the "Teams/Meet/Zoom" tab or your whole screen and ensure "Share audio" is enabled.
-                </p>
+
+            {(captureMode === "mobile" || captureMode === "whatsapp") && (
+              <div className="mt-6 p-4 bg-slate-900 rounded-xl text-slate-300 text-sm flex gap-3 items-center">
+                <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center flex-shrink-0 text-blue-400">i</div>
+                <p>TIP: For mobile/whatsapp calls, ensure your speakerphone is on so MeetScribe can hear both parties clearly.</p>
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      <div className="space-y-8">
-        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-          <FileText className="text-gray-400" />
-          Recent Meetings
-        </h2>
-        
-        {transcripts.length === 0 && !isRecording && (
-          <div className="py-20 text-center border-2 border-dashed rounded-3xl border-gray-100">
-            <div className="bg-gray-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Mic size={32} className="text-gray-300" />
-            </div>
-            <h3 className="text-xl font-bold text-gray-900">Start your first meeting</h3>
-            <p className="text-gray-500 mt-1">Conversations will be automatically transcribed and summarized.</p>
-          </div>
         )}
 
-        <div className="grid grid-cols-1 gap-8">
-          {transcripts.map((t) => (
-            <div key={t.id} className="bg-white border rounded-3xl shadow-sm hover:shadow-xl transition-all overflow-hidden border-gray-200">
-              <div className="p-8 bg-gray-50 border-b flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-3">
-                    <h3 className="text-xl font-bold text-gray-900">{t.title}</h3>
-                    <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-black uppercase rounded-full">
-                      {t.category}
-                    </span>
-                  </div>
-                  <div className="text-sm text-gray-500 flex items-center gap-2 font-medium">
-                    <Clock size={14} />
-                    {new Date(t.created_at).toLocaleDateString()} at {new Date(t.created_at).toLocaleTimeString()}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 px-4 py-2 bg-emerald-100 text-emerald-700 rounded-xl text-sm font-bold">
-                  <CheckCircle2 size={16} />
-                  PROCESSED BY AI
-                </div>
+        <div className="border-t border-slate-200 pt-12">
+          <h3 className="text-xl font-bold text-slate-900 mb-8 flex items-center gap-2">
+            <Clock className="w-5 h-5 text-slate-400" />
+            Recent Meetings
+          </h3>
+
+          {transcripts.length === 0 && !isRecording && (
+            <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-slate-300">
+              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <MessageSquare className="w-8 h-8 text-slate-300" />
               </div>
-
-              <div className="p-8 grid grid-cols-1 lg:grid-cols-2 gap-12">
-                <div className="space-y-6">
-                  <div className="flex items-center gap-2 font-black text-gray-900 uppercase tracking-widest text-xs">
-                    <MessageSquare size={16} className="text-blue-600" />
-                    Conversation History
-                  </div>
-                  <div className="space-y-6 max-h-[500px] overflow-y-auto pr-4 custom-scrollbar">
-                    {t.segments.map((s, i) => (
-                      <div key={i} className="group relative">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="w-10 h-10 rounded-2xl bg-gray-900 flex items-center justify-center text-white font-bold shadow-lg">
-                            {s.speaker_id.charAt(0)}
-                          </div>
-                          <div>
-                            <div className="text-sm font-black text-gray-900">{s.speaker_id}</div>
-                            <div className="text-[10px] font-bold text-gray-400">{Math.floor(s.start_time)}s</div>
-                          </div>
-                        </div>
-                        <p className="pl-13 text-gray-700 leading-relaxed text-sm bg-gray-50 p-4 rounded-2xl border border-transparent group-hover:border-gray-200 transition-all">
-                          {s.text}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-10">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 font-black text-gray-900 uppercase tracking-widest text-xs">
-                      <ClipboardList size={16} className="text-blue-600" />
-                      Executive Summary
-                    </div>
-                    <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 italic text-blue-900 text-sm leading-relaxed">
-                      "{t.summary}"
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 font-black text-gray-900 uppercase tracking-widest text-xs">
-                      <Zap size={16} className="text-blue-600" />
-                      Meeting Minutes
-                    </div>
-                    <ul className="space-y-3">
-                      {t.minutes?.map((item, i) => (
-                        <li key={i} className="flex items-start gap-4 p-4 bg-white border rounded-2xl hover:border-blue-300 transition-all shadow-sm">
-                          <div className="w-2 h-2 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
-                          <span className="text-sm text-gray-700 font-medium">{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </div>
+              <h4 className="text-slate-900 font-bold mb-1">Start your first meeting</h4>
+              <p className="text-slate-500 text-sm">Conversations will be automatically transcribed and summarized.</p>
             </div>
-          ))}
+          )}
+
+          <div className="space-y-8">
+            {transcripts.map((t) => (
+              <div key={t.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-shadow">
+                <div className="p-6 md:p-8">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                    <div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-2">{t.title}</h3>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold uppercase tracking-wider border border-blue-100">
+                          {t.category}
+                        </span>
+                        <span className="text-xs font-medium text-slate-400">
+                          {new Date(t.created_at).toLocaleDateString()} at {new Date(t.created_at).toLocaleTimeString()}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button 
+                        onClick={() => downloadTranscript(t)}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-bold transition-colors"
+                      >
+                        <Download className="w-4 h-4" />
+                        Download TXT
+                      </button>
+                      <div className="flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Processed by AI
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                    {/* Transcript segments */}
+                    <div className="lg:col-span-7">
+                      <div className="flex items-center gap-2 mb-6 text-slate-400 uppercase text-[10px] font-bold tracking-[0.2em]">
+                        <FileText className="w-3 h-3" />
+                        Conversation History
+                      </div>
+                      <div className="space-y-6 max-h-[500px] overflow-auto pr-4 custom-scrollbar">
+                        {t.segments.map((s, i) => (
+                          <div key={i} className="group">
+                            <div className="flex items-start gap-4">
+                              <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-500 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                {s.speaker_id.charAt(0)}
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-1">
+                                  <span className="text-xs font-bold text-slate-900">{s.speaker_id}</span>
+                                  <span className="text-[10px] text-slate-400 font-medium">{Math.floor(s.start_time)}s</span>
+                                </div>
+                                <p className="text-sm text-slate-600 leading-relaxed">{s.text}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Summary area */}
+                    <div className="lg:col-span-5 space-y-8">
+                      {t.summary && (
+                        <div className="p-6 bg-blue-50/50 rounded-2xl border border-blue-100/50">
+                          <div className="flex items-center gap-2 mb-4 text-blue-600 uppercase text-[10px] font-bold tracking-[0.2em]">
+                            <Zap className="w-3 h-3" />
+                            Executive Summary
+                          </div>
+                          <p className="text-sm text-slate-700 leading-relaxed font-medium italic">
+                            "{t.summary}"
+                          </p>
+                        </div>
+                      )}
+
+                      {t.minutes && t.minutes.length > 0 && (
+                        <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                          <div className="flex items-center gap-2 mb-4 text-slate-400 uppercase text-[10px] font-bold tracking-[0.2em]">
+                            <ClipboardList className="w-3 h-3" />
+                            Meeting Minutes
+                          </div>
+                          <ul className="space-y-3">
+                            {t.minutes.map((item, i) => (
+                              <li key={i} className="flex items-start gap-3 text-sm text-slate-600">
+                                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
+                                {item}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      <style jsx>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+      <style jsx global>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #e2e8f0;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #cbd5e1;
+        }
       `}</style>
     </div>
   );
