@@ -1,8 +1,8 @@
 """FastAPI application entry point."""
-
 from contextlib import asynccontextmanager
 import asyncio
 import logging
+import os
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -15,8 +15,8 @@ from app.database import engine, Base
 
 logger = logging.getLogger(__name__)
 
-STATIC_DIR = Path(__file__).parent.parent / "static"  # backend/static when running from /app
-
+# Use absolute path - in Docker container, WORKDIR is /app and static is copied there
+STATIC_DIR = Path("/app/static")
 
 async def init_db():
     """Create tables on startup (for dev; use Alembic in production)."""
@@ -31,16 +31,18 @@ async def init_db():
             if attempt < 5:
                 await asyncio.sleep(10)
             else:
-                logger.error("Database unavailable - app will start but API will fail. Check DATABASE_EXTERNAL_URL and DB IP allow list.")
-                return  # Don't block startup - allows Render to detect port
-
+                logger.error("Database unavailable - app will start but API will fail.")
+                return
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info("STATIC_DIR: %s, exists: %s", STATIC_DIR, STATIC_DIR.exists())
+    if STATIC_DIR.exists():
+        contents = list(STATIC_DIR.iterdir())
+        logger.info("Static dir contents: %s", contents)
     await init_db()
     yield
     await engine.dispose()
-
 
 app = FastAPI(
     title="Virtual Stenographer & Personal Assistant",
@@ -51,7 +53,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -61,28 +63,28 @@ app.include_router(transcripts.router, prefix="/api")
 app.include_router(assistant.router, prefix="/api")
 app.include_router(websocket.router)
 
-
 @app.get("/health")
 async def health():
     return {"status": "ok"}
 
-
 # Serve frontend static files when available (unified deployment)
 if STATIC_DIR.exists():
-    app.mount("/_next", StaticFiles(directory=STATIC_DIR / "_next"), name="next")
-    app.mount("/_next/static", StaticFiles(directory=STATIC_DIR / "_next" / "static"), name="next-static")
+    # Mount Next.js static assets
+    _next_dir = STATIC_DIR / "_next"
+    if _next_dir.exists():
+        app.mount("/_next", StaticFiles(directory=str(_next_dir)), name="next-assets")
 
     @app.get("/")
     async def root():
-        return FileResponse(STATIC_DIR / "index.html")
+        return FileResponse(str(STATIC_DIR / "index.html"))
 
     @app.get("/{path:path}")
     async def serve_spa(path: str):
         """Serve SPA - return index.html for client-side routes."""
         file_path = STATIC_DIR / path
         if file_path.is_file():
-            return FileResponse(file_path)
-        return FileResponse(STATIC_DIR / "index.html")
+            return FileResponse(str(file_path))
+        return FileResponse(str(STATIC_DIR / "index.html"))
 else:
     @app.get("/")
     async def root():
@@ -90,4 +92,6 @@ else:
             "name": "VPA - Virtual Stenographer & Personal Assistant",
             "docs": "/docs",
             "api": "/api",
+            "static_dir": str(STATIC_DIR),
+            "static_exists": STATIC_DIR.exists(),
         }
