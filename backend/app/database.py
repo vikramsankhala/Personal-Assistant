@@ -1,5 +1,7 @@
 """Database connection and session management."""
 
+from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
+
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
@@ -7,13 +9,31 @@ from app.config import get_settings
 
 settings = get_settings()
 
-# Async (FastAPI) - ensure asyncpg for postgres
+
+def _clean_asyncpg_url(url: str) -> tuple[str, dict]:
+    """Strip sslmode from URL (asyncpg doesn't support it) and return SSL connect_args."""
+    if "sqlite" in url or "+asyncpg" not in url and "postgresql" not in url:
+        return url, {}
+    parsed = urlparse(url)
+    query = parse_qs(parsed.query)
+    needs_ssl = "sslmode" in query and query["sslmode"][0] in ("require", "verify-full", "verify-ca")
+    query.pop("sslmode", None)
+    new_query = urlencode(query, doseq=True)
+    clean_url = urlunparse(parsed._replace(query=new_query))
+    if clean_url.startswith("postgresql://") and "+asyncpg" not in clean_url:
+        clean_url = clean_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    connect_args = {"ssl": True} if needs_ssl else {}
+    return clean_url, connect_args
+
+
+# Async (FastAPI) - ensure asyncpg for postgres, strip sslmode (Render compatibility)
 _db_url = settings.database_url
-if _db_url.startswith("postgresql://") and "+asyncpg" not in _db_url:
-    _db_url = _db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+_db_url, _async_connect_args = _clean_asyncpg_url(_db_url)
 _async_kw = {"echo": settings.debug}
 if "sqlite" not in _db_url:
     _async_kw["pool_pre_ping"] = True
+if _async_connect_args:
+    _async_kw["connect_args"] = _async_connect_args
 engine = create_async_engine(_db_url, **_async_kw)
 
 AsyncSessionLocal = async_sessionmaker(
