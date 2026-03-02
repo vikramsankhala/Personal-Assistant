@@ -8,8 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import transcripts, assistant, websocket
 from app.database import engine, Base
 
-# Create tables on startup (for dev; use Alembic in production)
+
 async def init_db():
+    """Create tables on startup (for dev; use Alembic in production)."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

@@ -1,5 +1,6 @@
 """Database connection and session management."""
 
+import ssl
 from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
 
 from sqlalchemy import create_engine
@@ -22,7 +23,7 @@ def _clean_asyncpg_url(url: str) -> tuple[str, dict]:
     clean_url = urlunparse(parsed._replace(query=new_query))
     if clean_url.startswith("postgresql://") and "+asyncpg" not in clean_url:
         clean_url = clean_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    connect_args = {"ssl": True} if needs_ssl else {}
+    connect_args = {"ssl": ssl.create_default_context()} if needs_ssl else {}
     return clean_url, connect_args
 
 
