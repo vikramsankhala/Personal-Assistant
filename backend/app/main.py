@@ -14,7 +14,7 @@ from app.database import engine, Base
 
 logger = logging.getLogger(__name__)
 
-STATIC_DIR = Path(__file__).parent.parent.parent / "static"
+STATIC_DIR = Path(__file__).parent.parent / "static"  # backend/static when running from /app
 
 
 async def init_db():
