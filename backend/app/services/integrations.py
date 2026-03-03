@@ -205,8 +205,7 @@ class SlackIntegration:
             {
                 "type": "section",
                 "text": {
-                    "type": "mrkdwn",
-                    "text": f"*Title:* {transcript_data.get('title', 'Meeting')}
+                    "type": "mrkdwn",                    "text": f"*Title:* {transcript_data.get('title', 'Meeting')}\n
 *Summary:* {transcript_data.get('summary', '')}"
                 }
             },
