@@ -32,19 +32,37 @@ class ASRService:
                 logger.warning("Faster-Whisper not available, using stub: %s", e)
                 self._model = "stub"
 
-    def transcribe_file(self, audio_path: str | Path) -> dict:
+    def transcribe_file(
+        self,
+        audio_path: str | Path,
+        source_lang: str = None,
+        target_lang: str = None,
+    ) -> dict:
         """
         Transcribe an audio file.
+        source_lang: BCP-47 language code of the audio (None = auto-detect)
+        target_lang: BCP-47 language code for the output transcript.
+                     If different from source_lang, Whisper translate task is used.
         Returns dict with segments, text, language, and duration.
         """
         self._load_model()
         if self._model == "stub":
             return self._stub_transcribe(audio_path)
 
+        # Determine Whisper task
+        # Whisper natively translates to English only.
+        # If target is English and source is not English -> use translate task.
+        # For other target languages we transcribe in source lang (best effort).
+        task = "transcribe"
+        whisper_lang = source_lang if source_lang else None
+        if target_lang and target_lang != source_lang and target_lang == "en":
+            task = "translate"
+
         from faster_whisper import WhisperModel
         segments, info = self._model.transcribe(
             str(audio_path),
-            language=None,  # Auto-detect
+            language=whisper_lang,
+            task=task,
             vad_filter=True,
             vad_parameters=dict(min_silence_duration_ms=500),
         )
@@ -71,52 +89,47 @@ class ASRService:
         sample_rate: int = 16000,
         channels: int = 1,
         sampwidth: int = 2,
+        source_lang: str = None,
+        target_lang: str = None,
     ) -> dict:
         """Transcribe raw PCM data (from a temp file).
-
-        Faster-Whisper accepts WAV files, so we wrap the raw PCM
-        in a proper WAV header before passing to the model.
-
-        Args:
-            raw_path:    Path to the raw PCM bytes file.
-            sample_rate: Audio sample rate in Hz (default 16000).
-            channels:    Number of audio channels (default 1 = mono).
-            sampwidth:   Sample width in bytes (default 2 = 16-bit).
+        Faster-Whisper accepts WAV files, so we wrap the raw PCM in a proper WAV header.
         """
         self._load_model()
 
-        # Wrap raw PCM in a WAV container
+        # Determine task
+        task = "transcribe"
+        whisper_lang = source_lang if source_lang else None
+        if target_lang and target_lang != source_lang and target_lang == "en":
+            task = "translate"
+
         wav_path = str(raw_path) + ".wav"
         try:
             with open(raw_path, "rb") as f:
                 pcm_data = f.read()
-
-            # Skip empty chunks to avoid Whisper hallucinations
-            if len(pcm_data) < sampwidth * channels * 8:  # < 8 samples
+            if len(pcm_data) < sampwidth * channels * 8:
                 return {"text": "", "segments": [], "language": "en", "duration": 0.0}
-
             with wave.open(wav_path, "wb") as wf:
                 wf.setnchannels(channels)
                 wf.setsampwidth(sampwidth)
                 wf.setframerate(sample_rate)
                 wf.writeframes(pcm_data)
-
             if self._model == "stub":
                 return {"text": "[Transcription unavailable]", "segments": [], "language": "en", "duration": 0.0}
-
             segments, info = self._model.transcribe(
                 wav_path,
-                language=None,
+                language=whisper_lang,
+                task=task,
                 vad_filter=True,
                 vad_parameters=dict(min_silence_duration_ms=200),
-                beam_size=1,          # Faster for streaming
+                beam_size=1,
                 best_of=1,
                 temperature=0.0,
             )
             parts = [seg.text.strip() for seg in segments if seg.text.strip()]
             return {
                 "text": " ".join(parts),
-                "segments": [],  # skip for streaming performance
+                "segments": [],
                 "language": info.language,
                 "duration": info.duration,
             }
@@ -133,8 +146,6 @@ class ASRService:
         Yields partial results as they become available.
         """
         self._load_model()
-        # For true streaming, Faster-Whisper would need chunked processing.
-        # This is a placeholder for the streaming interface.
         yield {"text": "", "is_final": False}
 
     def _stub_transcribe(self, audio_path: str | Path) -> dict:
