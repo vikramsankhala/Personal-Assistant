@@ -425,7 +425,6 @@ ${transcript.summary}
             ))}
           </div>
         </div>
-        {t && t.text && (
           <div className="mt-4 px-4 pb-4">
             <div className="border-t border-slate-200 pt-4">
               <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
@@ -465,7 +464,6 @@ ${transcript.summary}
               </div>
             </div>
           </div>
-        )}
       </div>
 
       <style jsx global>{`
