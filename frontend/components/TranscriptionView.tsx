@@ -436,4 +436,3 @@ ${transcript.summary}
     </div>
   );
 }
-Add multilingual support (source/target lang) and Meghalaya regional languages (Khasi, Garo, Jaintia)
