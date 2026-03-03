@@ -180,3 +180,38 @@ def _format_srt_time(seconds: float) -> str:
     s = int(seconds % 60)
     ms = int((seconds % 1) * 1000)
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+from app.services.integrations import IntegrationManager, IntegrationType
+
+@router.post("/{transcript_id}/send-to/{integration_type}")
+async def send_to_integration(
+    transcript_id: str,
+    integration_type: IntegrationType,
+    config: Dict[str, Any],
+    db: AsyncSession = Depends(get_db)
+):
+    """Send a transcript to a third-party integration"""
+    # Fetch transcript from DB
+    from sqlalchemy import select
+    from app.models.transcript import Transcript
+    
+    result = await db.execute(select(Transcript).where(Transcript.id == transcript_id))
+    transcript = result.scalar_one_or_none()
+    
+    if not transcript:
+        raise HTTPException(status_code=404, detail="Transcript not found")
+        
+    manager = IntegrationManager()
+    data = {
+        "title": transcript.title or f"Meeting {transcript_id}",
+        "text": transcript.text,
+        "summary": transcript.summary,
+        "timestamp": transcript.created_at.isoformat()
+    }
+    
+    res = await manager.send_transcript(integration_type, data, config)
+    if not res["success"]:
+        raise HTTPException(status_code=400, detail=res["error"])
+        
+    return res
