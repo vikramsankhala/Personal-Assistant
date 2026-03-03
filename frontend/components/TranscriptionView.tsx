@@ -425,47 +425,6 @@ ${transcript.summary}
             ))}
           </div>
         </div>
-          /* ORPHANED INTEGRATION SECTION - TO BE FIXED
-<div className="mt-4 px-4 pb-4">
-            <div className="border-t border-slate-200 pt-4">
-              <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                <span>Integrations</span>
-              </h3>
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-4">
-                {[
-                  { id: 'notion', label: 'Notion', color: 'bg-gray-100 text-gray-700' },
-                  { id: 'slack', label: 'Slack', color: 'bg-green-100 text-green-700' },
-                  { id: 'hubspot', label: 'HubSpot', color: 'bg-orange-100 text-orange-700' },
-                  { id: 'attio', label: 'Attio', color: 'bg-blue-100 text-blue-700' },
-                  { id: 'affinity', label: 'Affinity', color: 'bg-purple-100 text-purple-700' },
-                  { id: 'zapier', label: 'Zapier', color: 'bg-red-100 text-red-700' },
-                ].map(app => (
-                  <button
-                    key={app.id}
-                    onClick={() => {
-                      const key = prompt(`Enter your ${app.label} API key or Webhook URL:`);
-                      if (!key) return;
-                      const body: Record<string,string> = {};
-                      if (['slack','zapier'].includes(app.id)) body.webhook_url = key;
-                      else body.api_key = key;
-                      fetch(`${API_BASE}/api/transcripts/${t.id}/send-to/${app.id}`, {
-                        method: 'POST',
-                        headers: {'Content-Type':'application/json'},
-                        body: JSON.stringify(body)
-                      })
-                      .then(r => r.json())
-                      .then(d => alert(d.success ? `Sent to ${app.label}!` : `Error: ${d.error}`))
-                      .catch(() => alert('Failed to connect'));
-                    }}
-                    className={`${app.color} text-xs font-medium py-1.5 px-2 rounded-lg border border-current/20 hover:opacity-80 transition-opacity`}
-                  >
-                    {app.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-      </div>
-*/
 
       <style jsx global>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
