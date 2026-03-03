@@ -264,7 +264,7 @@ ${transcript.summary}
     URL.revokeObjectURL(url);
   };
 
-  return (
+    return (
     <div className="flex flex-col h-full bg-white">
       <input type="file" ref={fileInputRef} onChange={handleFileUpload} accept="audio/*" className="hidden" />
       
