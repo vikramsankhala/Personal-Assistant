@@ -1,9 +1,8 @@
 """Transcript API routes."""
-
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -21,6 +20,8 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 async def upload_audio(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    source_lang: str = Form(None),
+    target_lang: str = Form(None),
     db: AsyncSession = Depends(get_db),
 ):
     """Upload audio file for transcription."""
@@ -52,7 +53,11 @@ async def upload_audio(
 
     async def process():
         pipeline = TranscriptionPipeline()
-        result = await pipeline.process_audio(save_path)
+        result = await pipeline.process_audio(
+            save_path,
+            source_lang=source_lang,
+            target_lang=target_lang,
+        )
         from app.database import AsyncSessionLocal
         async with AsyncSessionLocal() as session:
             t = await session.get(Transcript, transcript_id)
@@ -78,7 +83,6 @@ async def upload_audio(
                 await session.commit()
 
     background_tasks.add_task(process)
-
     return TranscriptResponse(
         id=transcript_id,
         title=transcript.title,
@@ -95,7 +99,6 @@ async def get_transcript(transcript_id: str, db: AsyncSession = Depends(get_db))
     transcript = await db.get(Transcript, transcript_id)
     if not transcript:
         raise HTTPException(404, "Transcript not found")
-
     segments = [
         SegmentResponse(
             speaker_id=s.speaker_id or "SPEAKER_00",
@@ -107,7 +110,6 @@ async def get_transcript(transcript_id: str, db: AsyncSession = Depends(get_db))
         )
         for s in transcript.segments
     ]
-
     return TranscriptResponse(
         id=transcript.id,
         title=transcript.title,
@@ -135,7 +137,6 @@ async def export_transcript(
     transcript = await db.get(Transcript, transcript_id)
     if not transcript:
         raise HTTPException(404, "Transcript not found")
-
     if format == TranscriptExportFormat.JSON:
         from fastapi.responses import JSONResponse
         return JSONResponse({
@@ -149,7 +150,6 @@ async def export_transcript(
                 for s in transcript.segments
             ],
         })
-
     if format == TranscriptExportFormat.MARKDOWN:
         from fastapi.responses import PlainTextResponse
         md = f"# {transcript.title or 'Transcript'}\n\n"
@@ -163,7 +163,6 @@ async def export_transcript(
             for a in transcript.action_items:
                 md += f"- {a}\n"
         return PlainTextResponse(md)
-
     if format == TranscriptExportFormat.SRT:
         from fastapi.responses import PlainTextResponse
         srt_lines = []
@@ -172,7 +171,6 @@ async def export_transcript(
             end = _format_srt_time(s.end_time)
             srt_lines.append(f"{i}\n{start} --> {end}\n{s.text}\n")
         return PlainTextResponse("\n".join(srt_lines))
-
     raise HTTPException(400, f"Export format {format} not yet implemented")
 
 
