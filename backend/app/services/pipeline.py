@@ -1,5 +1,4 @@
-"""Full transcription pipeline: VAD → ASR → Diarization → NLP → LLM."""
-
+"""Full transcription pipeline: VAD -> ASR -> Diarization -> NLP -> LLM."""
 import logging
 from pathlib import Path
 from typing import Any
@@ -19,9 +18,16 @@ class TranscriptionPipeline:
         self.diarization = get_diarization_service()
         self.llm = get_llm_service()
 
-    async def process_audio(self, audio_path: str | Path) -> dict[str, Any]:
+    async def process_audio(
+        self,
+        audio_path: str | Path,
+        source_lang: str = None,
+        target_lang: str = None,
+    ) -> dict[str, Any]:
         """
         Process audio file through full pipeline.
+        source_lang: BCP-47 code of spoken language (None = auto-detect)
+        target_lang: BCP-47 code for output language (None = same as source)
         Returns structured transcript with segments, summary, action items.
         """
         path = Path(audio_path)
@@ -29,7 +35,11 @@ class TranscriptionPipeline:
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
         # 1. ASR
-        asr_result = self.asr.transcribe_file(path)
+        asr_result = self.asr.transcribe_file(
+            path,
+            source_lang=source_lang,
+            target_lang=target_lang,
+        )
         segments = asr_result["segments"]
         full_text = asr_result["text"]
         language = asr_result.get("language", "en")
