@@ -119,7 +119,7 @@ export function TranscriptionView() {
       socket.onopen = () => {
         let modeLabel = captureMode.charAt(0).toUpperCase() + captureMode.slice(1);
         socket.send(JSON.stringify({ 
-          type: "start", 
+          type: "config", 
           category: selectedCategory.id,
           source_lang: sourceLang,
           target_lang: targetLang,
@@ -169,7 +169,7 @@ export function TranscriptionView() {
       setIsRecording(true);
       setRealtimeText(`Processing ${file.name}... (Translating from ${sourceLang} to ${targetLang})`);
       
-      const response = await fetch(`${API_BASE}/transcribe-file`, {
+      const response = await fetch(`${API_BASE}/transcripts/upload`, {
         method: "POST",
         body: formData,
       });
