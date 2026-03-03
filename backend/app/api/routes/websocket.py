@@ -5,14 +5,13 @@ import logging
 import tempfile
 import os
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-
 from app.services.asr import get_asr_service
 
 router = APIRouter(tags=["websocket"])
 logger = logging.getLogger(__name__)
 
 # Minimum bytes before we attempt transcription:
-# 16kHz mono 16-bit PCM = 32000 bytes/sec  →  ~0.5 sec chunk
+# 16kHz mono 16-bit PCM = 32000 bytes/sec  ->  ~0.5 sec chunk
 CHUNK_BYTES = 16000  # 0.5 s of 16kHz mono PCM
 
 
@@ -22,14 +21,21 @@ async def websocket_transcribe(websocket: WebSocket):
 
     Protocol
     --------
-    Client  → server : raw PCM bytes  (16 kHz, mono, 16-bit little-endian)
-                       OR the JSON string  {"type": "stop"}
-    Server  → client : JSON  {"text": str, "is_final": bool, "error"?: str}
+    Client -> server :
+        1. First message (optional JSON config):
+           {"type": "config", "source_lang": "hi", "target_lang": "en"}
+        2. Raw PCM bytes  (16 kHz, mono, 16-bit little-endian)
+        3. JSON stop message: {"type": "stop"}
+    Server -> client : JSON {"text": str, "is_final": bool, "error"?: str}
     """
     await websocket.accept()
     asr = get_asr_service()
     buffer = bytearray()
     transcript_parts: list[str] = []
+
+    # Language config (set by optional first config message)
+    source_lang: str | None = None
+    target_lang: str | None = None
 
     async def transcribe_chunk(chunk: bytes) -> str | None:
         """Write chunk to a temp WAV file and transcribe it."""
@@ -41,10 +47,15 @@ async def websocket_transcribe(websocket: WebSocket):
                 tmp.write(chunk)
                 tmp_path = tmp.name
 
-            # Run blocking Whisper call in thread pool so we don't block the event loop
+            # Run blocking Whisper call in thread pool
             result = await loop.run_in_executor(
                 None,
-                lambda: asr.transcribe_raw_pcm(tmp_path, sample_rate=16000),
+                lambda: asr.transcribe_raw_pcm(
+                    tmp_path,
+                    sample_rate=16000,
+                    source_lang=source_lang,
+                    target_lang=target_lang,
+                ),
             )
             return result.get("text", "").strip()
         except Exception as exc:
@@ -59,20 +70,31 @@ async def websocket_transcribe(websocket: WebSocket):
     try:
         while True:
             try:
-                # receive_bytes or receive_text (for control messages)
                 message = await asyncio.wait_for(
                     websocket.receive(), timeout=30.0
                 )
             except asyncio.TimeoutError:
-                # Keep-alive ping
                 await websocket.send_json({"text": "", "is_final": False, "ping": True})
                 continue
 
-            # Handle text control messages
+            # Handle text control / config messages
             if message["type"] == "websocket.receive" and message.get("text"):
                 try:
                     ctrl = json.loads(message["text"])
-                    if ctrl.get("type") == "stop":
+                    msg_type = ctrl.get("type", "")
+
+                    if msg_type == "config":
+                        # Store language settings for this session
+                        source_lang = ctrl.get("source_lang") or None
+                        target_lang = ctrl.get("target_lang") or None
+                        logger.info(
+                            "WS language config: source=%s target=%s",
+                            source_lang, target_lang,
+                        )
+                        await websocket.send_json({"type": "config_ack", "ok": True})
+                        continue
+
+                    if msg_type == "stop":
                         # Flush remaining buffer
                         if buffer:
                             text = await transcribe_chunk(bytes(buffer))
@@ -96,11 +118,9 @@ async def websocket_transcribe(websocket: WebSocket):
                 data: bytes = message["bytes"]
                 buffer.extend(data)
 
-                # Process when we have enough audio
                 while len(buffer) >= CHUNK_BYTES:
                     chunk = bytes(buffer[:CHUNK_BYTES])
                     buffer = buffer[CHUNK_BYTES:]
-
                     text = await transcribe_chunk(chunk)
                     if text:
                         transcript_parts.append(text)
