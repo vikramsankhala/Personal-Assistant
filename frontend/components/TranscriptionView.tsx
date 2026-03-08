@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
-const WS_BASE = (process.env.NEXT_PUBLIC_API_URL || "").replace(/^http/, "ws");
+const WS_BASE = API_BASE ? API_BASE.replace(/^http/, "ws") : "ws://localhost:8000";
 
 const MEETING_CATEGORIES = [
   { id: "general", label: "General Meeting", icon: Globe },
@@ -169,7 +169,7 @@ export function TranscriptionView() {
       setIsRecording(true);
       setRealtimeText(`Processing ${file.name}... (Translating from ${sourceLang} to ${targetLang})`);
       
-      const response = await fetch(`${API_BASE}/transcripts/upload`, {
+      const response = await fetch(`${API_BASE}/api/transcripts/upload`, {
         method: "POST",
         body: formData,
       });
@@ -287,7 +287,9 @@ ${transcript.summary}
                       { id: 'system', label: 'System', icon: Monitor },
                       { id: 'mobile', label: 'Mobile', icon: Phone },
                       { id: 'whatsapp', label: 'WhatsApp', icon: MessageCircle },
-                    ].map((mode) => (
+                    ].map((mode) => {
+                      const Icon = mode.icon;
+                      return (
                       <button
                         key={mode.id}
                         onClick={() => setCaptureMode(mode.id as any)}
@@ -296,9 +298,9 @@ ${transcript.summary}
                           captureMode === mode.id ? "bg-white text-blue-600 shadow-sm shadow-blue-900/10" : "text-slate-500 hover:text-slate-700"
                         }`}
                       >
-                        <mode.icon size={14} /> {mode.label}
+                        <Icon size={14} /> {mode.label}
                       </button>
-                    ))}
+                    );})}
                   </div>
                 </div>
 
@@ -432,6 +434,7 @@ ${transcript.summary}
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
       `}</style>
+      </div>
     </div>
   );
 }
