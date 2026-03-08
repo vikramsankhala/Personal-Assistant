@@ -9,7 +9,7 @@ One deployment serves both the web app and API at the same URL.
 - **Docker Build Context Directory:** `.`
 - **Dockerfile Path:** `./Dockerfile`
 - **Environment:** `DATABASE_EXTERNAL_URL` = your Postgres External URL
-- **Environment:** `GROQ_API_KEY` = your Groq API key (free at [groq.com](https://console.groq.com)) — enables Assistant on cloud
+- **Environment:** `ANTHROPIC_API_KEY` or `GROQ_API_KEY` — enables Assistant on cloud (Anthropic from [claude.ai](https://console.anthropic.com), Groq free at [groq.com](https://console.groq.com))
 
 The root `Dockerfile` builds the frontend and backend together. Visit your service URL for the app; `/api` and `/docs` for the API.
 

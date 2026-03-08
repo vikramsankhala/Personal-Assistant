@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     groq_api_key: str | None = None
     groq_model: str = "llama-3.1-8b-instant"
 
+    # Anthropic (cloud - claude.ai)
+    anthropic_api_key: str | None = None
+    anthropic_model: str = "claude-3-5-haiku-20241022"
+
     # HuggingFace (for PyAnnote)
     hf_token: str | None = None
 

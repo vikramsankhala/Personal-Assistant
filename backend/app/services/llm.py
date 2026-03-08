@@ -1,4 +1,4 @@
-"""LLM service via Ollama (local) or Groq (cloud)."""
+"""LLM service via Anthropic, Groq (cloud), or Ollama (local)."""
 
 import logging
 from typing import Any
@@ -9,13 +9,13 @@ from app.config import get_settings
 logger = logging.getLogger(__name__)
 
 FALLBACK_MSG = (
-    "I'm not connected to an LLM. For cloud deployment, add GROQ_API_KEY "
-    "(free at groq.com). For local use, run: ollama run llama3.1"
+    "I'm not connected to an LLM. Add ANTHROPIC_API_KEY, GROQ_API_KEY, "
+    "or run locally: ollama run llama3.1"
 )
 
 
 class LLMService:
-    """LLM integration - Groq (cloud) or Ollama (local)."""
+    """LLM integration - Anthropic > Groq > Ollama."""
 
     def __init__(self):
         self._settings = get_settings()
@@ -26,10 +26,43 @@ class LLMService:
         system: str | None = None,
         temperature: float = 0.7,
     ) -> str:
-        """Generate completion from Groq or Ollama."""
+        """Generate completion from Anthropic, Groq, or Ollama."""
+        if self._settings.anthropic_api_key:
+            return await self._generate_anthropic(prompt, system, temperature)
         if self._settings.groq_api_key:
             return await self._generate_groq(prompt, system, temperature)
         return await self._generate_ollama(prompt, system, temperature)
+
+    async def _generate_anthropic(
+        self, prompt: str, system: str | None, temperature: float
+    ) -> str:
+        """Generate via Anthropic API (Claude)."""
+        payload: dict[str, Any] = {
+            "model": self._settings.anthropic_model,
+            "max_tokens": 1024,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperature,
+        }
+        if system:
+            payload["system"] = system
+
+        try:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                r = await client.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": self._settings.anthropic_api_key,
+                        "anthropic-version": "2023-06-01",
+                        "Content-Type": "application/json",
+                    },
+                    json=payload,
+                )
+                r.raise_for_status()
+                data = r.json()
+                return data["content"][0]["text"].strip()
+        except Exception as e:
+            logger.exception("Anthropic error: %s", e)
+            return f"[Anthropic error: {e}]"
 
     async def _generate_groq(
         self, prompt: str, system: str | None, temperature: float
