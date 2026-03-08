@@ -34,15 +34,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     celery_broker_url: str = "redis://localhost:6379/1"
 
-    # Ollama (local)
-    ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "llama3.1"
-
-    # Groq (cloud - free tier at groq.com)
-    groq_api_key: str | None = None
-    groq_model: str = "llama-3.1-8b-instant"
-
-    # Anthropic (cloud - claude.ai)
+    # Anthropic (Claude) - required for Assistant
     anthropic_api_key: str | None = None
     anthropic_model: str = "claude-3-5-haiku-20241022"
 

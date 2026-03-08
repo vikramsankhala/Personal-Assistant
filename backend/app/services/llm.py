@@ -1,4 +1,4 @@
-"""LLM service via Anthropic, Groq (cloud), or Ollama (local)."""
+"""LLM service via Anthropic (Claude) only."""
 
 import logging
 from typing import Any
@@ -9,13 +9,12 @@ from app.config import get_settings
 logger = logging.getLogger(__name__)
 
 FALLBACK_MSG = (
-    "I'm not connected to an LLM. Add ANTHROPIC_API_KEY, GROQ_API_KEY, "
-    "or run locally: ollama run llama3.1"
+    "I'm not connected to an LLM. Add ANTHROPIC_API_KEY (get one at console.anthropic.com)."
 )
 
 
 class LLMService:
-    """LLM integration - Anthropic > Groq > Ollama."""
+    """LLM integration - Anthropic (Claude) only."""
 
     def __init__(self):
         self._settings = get_settings()
@@ -26,12 +25,10 @@ class LLMService:
         system: str | None = None,
         temperature: float = 0.7,
     ) -> str:
-        """Generate completion from Anthropic, Groq, or Ollama."""
+        """Generate completion from Anthropic."""
         if self._settings.anthropic_api_key:
             return await self._generate_anthropic(prompt, system, temperature)
-        if self._settings.groq_api_key:
-            return await self._generate_groq(prompt, system, temperature)
-        return await self._generate_ollama(prompt, system, temperature)
+        return FALLBACK_MSG
 
     async def _generate_anthropic(
         self, prompt: str, system: str | None, temperature: float
@@ -63,66 +60,6 @@ class LLMService:
         except Exception as e:
             logger.exception("Anthropic error: %s", e)
             return f"[Anthropic error: {e}]"
-
-    async def _generate_groq(
-        self, prompt: str, system: str | None, temperature: float
-    ) -> str:
-        """Generate via Groq API (cloud)."""
-        messages = []
-        if system:
-            messages.append({"role": "system", "content": system})
-        messages.append({"role": "user", "content": prompt})
-
-        try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                r = await client.post(
-                    "https://api.groq.com/openai/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self._settings.groq_api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": self._settings.groq_model,
-                        "messages": messages,
-                        "temperature": temperature,
-                    },
-                )
-                r.raise_for_status()
-                data = r.json()
-                return data["choices"][0]["message"]["content"].strip()
-        except Exception as e:
-            logger.exception("Groq error: %s", e)
-            return f"[Groq error: {e}]"
-
-    async def _generate_ollama(
-        self, prompt: str, system: str | None, temperature: float
-    ) -> str:
-        """Generate via Ollama (local)."""
-        base_url = self._settings.ollama_base_url.rstrip("/")
-        payload: dict[str, Any] = {
-            "model": self._settings.ollama_model,
-            "prompt": prompt,
-            "stream": False,
-            "options": {"temperature": temperature},
-        }
-        if system:
-            payload["system"] = system
-
-        try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                r = await client.post(
-                    f"{base_url}/api/generate",
-                    json=payload,
-                )
-                r.raise_for_status()
-                data = r.json()
-                return data.get("response", "")
-        except httpx.ConnectError:
-            logger.warning("Ollama not reachable at %s", base_url)
-            return FALLBACK_MSG
-        except Exception as e:
-            logger.exception("LLM error: %s", e)
-            return f"[Error: {e}]"
 
     async def classify_intent(self, text: str) -> str:
         """Classify user intent (note, reminder, draft, etc.)."""
